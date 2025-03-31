@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Allocation Details - Da Vinci Teacher Allocation</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .info-panel {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .teacher-card {
+            margin-bottom: 15px;
+        }
+        .teacher-score {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .badge-workload {
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h1>Allocation Details</h1>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Back to Dashboard</a>
+                </div>
+                
+                <!-- Flash messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                <!-- Student Information -->
+                <div class="info-panel mt-3">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h3>Student Information</h3>
+                            <p><strong>Name:</strong> {{ allocation.student_name }}</p>
+                            <p><strong>Email:</strong> {{ allocation.student_email }}</p>
+                            <p><strong>Guardian Email:</strong> {{ allocation.guardian_email }}</p>
+                            <p><strong>Request Email:</strong> {{ allocation.request_email }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h3>Allocation Details</h3>
+                            <p><strong>Subject:</strong> 
+                                {% if allocation.current_subject %}
+                                    {{ allocation.current_subject }}
+                                {% else %}
+                                    {{ allocation.subjects|join(', ') }}
+                                {% endif %}
+                            </p>
+                            <p><strong>Start Date:</strong> {{ allocation.start_date }}</p>
+                            <p><strong>Package Hours:</strong> {{ allocation.package_hours }}</p>
+                            <p><strong>Session Frequency:</strong> {{ allocation.session_frequency }}</p>
+                            <p><strong>Status:</strong> {{ allocation.status.value|capitalize }}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Additional Details -->
+                <div class="info-panel">
+                    <h3>Additional Information</h3>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Student Availability</h5>
+                            <pre class="p-2 bg-light">{{ allocation.student_availability }}</pre>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Holiday Schedule</h5>
+                            <pre class="p-2 bg-light">{{ allocation.holiday_schedule }}</pre>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-12">
+                            <h5>Additional Notes</h5>
+                            <pre class="p-2 bg-light">{{ allocation.additional_notes }}</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Teacher Matching (if in progress) -->
+                {% if allocation.status.value == 'in_progress' %}
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h3>Teacher Matching</h3>
+                        </div>
+                        <div class="card-body">
+                            {% if not allocation.matching_teachers %}
+                                <!-- If no matching has been done yet -->
+                                <p>No teacher matching has been done yet.</p>
+                                <form action="{{ url_for('match_teachers', allocation_id=allocation.id) }}" method="post">
+                                    <button type="submit" class="btn btn-primary">Find Matching Teachers</button>
+                                </form>
+                            {% else %}
+                                <!-- Display matching teachers -->
+                                <h4>Available Teachers</h4>
+                                <p>Select teachers to invite:</p>
+                                
+                                <form action="{{ url_for('send_invitations', allocation_id=allocation.id) }}" method="post">
+                                    <div class="row">
+                                        {% for teacher in allocation.matching_teachers %}
+                                            <div class="col-md-4">
+                                                <div class="card teacher-card">
+                                                    <div class="card-header d-flex justify-content-between">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="selected_teachers" value="{{ teacher.id }}" id="teacher-{{ teacher.id }}">
+                                                            <label class="form-check-label" for="teacher-{{ teacher.id }}">
+                                                                {{ teacher.name }}
+                                                            </label>
+                                                        </div>
+                                                        <span class="teacher-score" data-bs-toggle="tooltip" title="Match Score">{{ teacher.score }}</span>
+                                                    </div>
+                                                    <div class="card-body">
+                                                        <p><strong>Email:</strong> {{ teacher.email }}</p>
+                                                        <p>
+                                                            <strong>Students:</strong> {{ teacher.active_students }}
+                                                            {% if teacher.active_students > 30 %}
+                                                                <span class="badge bg-danger badge-workload">High</span>
+                                                            {% elif teacher.active_students > 20 %}
+                                                                <span class="badge bg-warning badge-workload">Medium</span>
+                                                            {% else %}
+                                                                <span class="badge bg-success badge-workload">Low</span>
+                                                            {% endif %}
+                                                        </p>
+                                                        <p><strong>Expertise:</strong> {{ teacher.subject_expertise|default(3) }}/5</p>
+                                                        <p><strong>Rating:</strong> {{ teacher.average_rating|default(4.0) }}/5</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-success mt-3">Send Invitations to Selected Teachers</button>
+                                    <a href="{{ url_for('match_teachers', allocation_id=allocation.id) }}" class="btn btn-outline-secondary mt-3">Refresh Teacher List</a>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Invitation Status (if invitations have been sent) -->
+                    {% if allocation.invited_teachers %}
+                        <div class="card mt-4">
+                            <div class="card-header">
+                                <h3>Invitation Status</h3>
+                            </div>
+                            <div class="card-body">
+                                <p>Invitations have been sent to the following teachers:</p>
+                                <ul class="list-group">
+                                    {% for teacher_id in allocation.invited_teachers %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            {% for teacher in allocation.matching_teachers %}
+                                                {% if teacher.id == teacher_id %}
+                                                    {{ teacher.name }}
+                                                    <form action="{{ url_for('confirm_teacher', allocation_id=allocation.id) }}" method="post" class="d-inline">
+                                                        <input type="hidden" name="accepted_teacher_id" value="{{ teacher.id }}">
+                                                        <button type="submit" class="btn btn-sm btn-success">Confirm Acceptance</button>
+                                                    </form>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endif %}
+                
+                <!-- If completed, show confirmed teacher -->
+                {% if allocation.status.value == 'completed' and allocation.confirmed_teacher %}
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h3>Confirmed Teacher</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h4>{{ allocation.confirmed_teacher.name }}</h4>
+                                    <p><strong>Email:</strong> {{ allocation.confirmed_teacher.email }}</p>
+                                    <p><strong>Active Students:</strong> {{ allocation.confirmed_teacher.active_students }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5>Confirmation Date</h5>
+                                    <p>{{ allocation.date_completed }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+                
+                <!-- If this is a parent allocation with children -->
+                {% if allocation.child_allocation_ids %}
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h3>Subject Allocations</h3>
+                        </div>
+                        <div class="card-body">
+                            <p>This multi-subject allocation has been split into individual subject allocations:</p>
+                            <ul class="list-group">
+                                {% for child_id in allocation.child_allocation_ids %}
+                                    <li class="list-group-item">
+                                        <a href="{{ url_for('view_allocation', allocation_id=child_id) }}" class="btn btn-link">View Subject Allocation</a>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Initialize tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    </script>
+</body>
+</html> 
